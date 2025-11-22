@@ -1,15 +1,276 @@
 import customtkinter as ctk
+from tkinter import ttk
+from tkinter import messagebox
+import oracledb
 from db import db_connector
 
+# --- VARIABLES GLOBALES ---
+carrito_productos = []
+cliente_seleccionado = {"id": None, "nombre": "Público General"} 
+DEFAULT_EMPLEADO_ID = 1 
 
 def create_sales_view(parent_frame):
+    global tree_carrito, lbl_total_valor, entry_id_prod, entry_cantidad
+    global lbl_cliente_actual, entry_buscar_apellido, combo_clientes_encontrados
+    global opciones_clientes_encontrados
+
+    # Reiniciar estado
+    carrito_productos.clear()
+    cliente_seleccionado["id"] = 1 
+    cliente_seleccionado["nombre"] = "Cliente Genérico (ID 1)"
+    opciones_clientes_encontrados = []
+
+    # Configuración Visual Principal
     parent_frame.grid_columnconfigure(0, weight=1)
+    parent_frame.grid_columnconfigure(1, weight=2) 
+    parent_frame.grid_rowconfigure(1, weight=1)
 
-    title_label = ctk.CTkLabel(parent_frame, text="Registrar Nueva Venta",
-                               font=ctk.CTkFont(size=24, weight="bold"),
-                               text_color="#333333")
-    title_label.grid(row=0, column=0, padx=20, pady=20, sticky="w")
+    ctk.CTkLabel(parent_frame, text="Punto de Venta (Modo Compatible)", 
+                 font=ctk.CTkFont(size=24, weight="bold"), text_color="#333").grid(row=0, column=0, columnspan=2, padx=20, pady=20, sticky="w")
 
-    placeholder = ctk.CTkLabel(parent_frame, text="Aquí va el formulario de Gerardo (Mockup 2)",
-                               font=ctk.CTkFont(size=16), text_color="#666666")
-    placeholder.grid(row=1, column=0, padx=20, pady=20)
+    # === PANEL IZQUIERDO: DATOS ===
+    left_frame = ctk.CTkFrame(parent_frame, fg_color="#F9F9F9", corner_radius=10)
+    left_frame.grid(row=1, column=0, sticky="nsew", padx=(20, 10), pady=10)
+
+    # 1. Sección Cliente
+    ctk.CTkLabel(left_frame, text="Cliente", font=ctk.CTkFont(size=16, weight="bold"), text_color="#555").pack(pady=(15, 5))
+    lbl_cliente_actual = ctk.CTkLabel(left_frame, text=f"Seleccionado: {cliente_seleccionado['nombre']}", text_color="#2980B9", font=ctk.CTkFont(weight="bold"))
+    lbl_cliente_actual.pack(pady=5)
+
+    search_frame = ctk.CTkFrame(left_frame, fg_color="transparent")
+    search_frame.pack(pady=5, padx=10, fill="x")
+    
+    entry_buscar_apellido = ctk.CTkEntry(search_frame, placeholder_text="Buscar Apellido...")
+    entry_buscar_apellido.pack(side="left", fill="x", expand=True, padx=(0, 5))
+    ctk.CTkButton(search_frame, text="🔍", width=40, command=buscar_cliente, fg_color="#3498DB").pack(side="right")
+
+    combo_clientes_encontrados = ctk.CTkComboBox(left_frame, values=["Sin resultados"], command=seleccionar_cliente)
+    combo_clientes_encontrados.pack(pady=5, padx=10, fill="x")
+
+    ctk.CTkButton(left_frame, text="➕ Nuevo Cliente", command=ventana_nuevo_cliente, fg_color="#27AE60", height=30).pack(pady=(5, 15), padx=10, fill="x")
+    
+    ctk.CTkFrame(left_frame, height=2, fg_color="#E0E0E0").pack(fill="x", padx=20, pady=10)
+
+    # 2. Sección Producto
+    ctk.CTkLabel(left_frame, text="Producto", font=ctk.CTkFont(size=16, weight="bold"), text_color="#555").pack(pady=5)
+    
+    ctk.CTkLabel(left_frame, text="ID Producto:", text_color="#555").pack()
+    entry_id_prod = ctk.CTkEntry(left_frame, width=200, fg_color="white", text_color="black")
+    entry_id_prod.pack(pady=5)
+    entry_id_prod.bind('<Return>', lambda e: agregar_producto()) # Enter para agregar
+
+    ctk.CTkLabel(left_frame, text="Cantidad:", text_color="#555").pack()
+    entry_cantidad = ctk.CTkEntry(left_frame, width=200, fg_color="white", text_color="black")
+    entry_cantidad.pack(pady=5)
+    entry_cantidad.insert(0, "1")
+    entry_cantidad.bind('<Return>', lambda e: agregar_producto())
+
+    ctk.CTkButton(left_frame, text="Agregar 🛒", command=agregar_producto, fg_color="#5BC0DE").pack(pady=20)
+
+    # === PANEL DERECHO: CARRITO ===
+    right_frame = ctk.CTkFrame(parent_frame, fg_color="transparent")
+    right_frame.grid(row=1, column=1, sticky="nsew", padx=(10, 20), pady=10)
+    
+    style = ttk.Style()
+    style.configure("Treeview", rowheight=30, font=("Arial", 11))
+    style.configure("Treeview.Heading", font=("Arial", 11, "bold"), background="#E0E0E0")
+
+    columns = ("id", "nombre", "precio", "cantidad", "subtotal")
+    tree_carrito = ttk.Treeview(right_frame, columns=columns, show="headings", height=15)
+    
+    headers = ["ID", "Producto", "Precio", "Cant.", "Subtotal"]
+    widths = [50, 200, 80, 60, 100]
+    anchors = ["center", "w", "e", "center", "e"]
+    
+    for col, head, w, anch in zip(columns, headers, widths, anchors):
+        tree_carrito.heading(col, text=head)
+        tree_carrito.column(col, width=w, anchor=anch)
+
+    tree_carrito.pack(fill="both", expand=True)
+
+    # === PIE DE PÁGINA: TOTALES ===
+    bottom_frame = ctk.CTkFrame(parent_frame, fg_color="white", height=80)
+    bottom_frame.grid(row=2, column=0, columnspan=2, sticky="ew", padx=20, pady=(0, 20))
+
+    ctk.CTkLabel(bottom_frame, text="TOTAL:", font=ctk.CTkFont(size=16)).pack(side="left", padx=20)
+    lbl_total_valor = ctk.CTkLabel(bottom_frame, text="$ 0.00", font=ctk.CTkFont(size=24, weight="bold"), text_color="#27AE60")
+    lbl_total_valor.pack(side="left", padx=10)
+
+    ctk.CTkButton(bottom_frame, text="✅ CONFIRMAR VENTA", command=finalizar_venta_segura, 
+                  fg_color="#28a745", width=200, height=40, font=ctk.CTkFont(weight="bold")).pack(side="right", padx=20)
+
+
+# ==========================================
+# LÓGICA DE NEGOCIO (Simplificada)
+# ==========================================
+
+def buscar_cliente():
+    apellido = entry_buscar_apellido.get().strip()
+    if not apellido: return
+
+    conn = db_connector.get_connection()
+    if not conn: return
+    
+    try:
+        cursor = conn.cursor()
+        # Busca clientes parecidos al apellido
+        cursor.execute("SELECT id_cliente, nombre, apellido, dni FROM clientes WHERE LOWER(apellido) LIKE LOWER(:1)", [f"%{apellido}%"])
+        rows = cursor.fetchall()
+        
+        global opciones_clientes_encontrados
+        opciones_clientes_encontrados = []
+        lista_visual = []
+
+        if rows:
+            for r in rows:
+                opciones_clientes_encontrados.append({"id": r[0], "nombre": f"{r[1]} {r[2]}"})
+                lista_visual.append(f"{r[2]}, {r[1]} (DNI: {r[3]})")
+            
+            combo_clientes_encontrados.configure(values=lista_visual)
+            combo_clientes_encontrados.set(lista_visual[0])
+            seleccionar_cliente(lista_visual[0])
+        else:
+            combo_clientes_encontrados.configure(values=["No encontrado"])
+            combo_clientes_encontrados.set("No encontrado")
+
+    except Exception as e:
+        print(e)
+    finally:
+        db_connector.release_connection(conn)
+
+def seleccionar_cliente(valor):
+    if not opciones_clientes_encontrados: return
+    vals = combo_clientes_encontrados.cget("values")
+    if valor in vals:
+        idx = vals.index(valor)
+        sel = opciones_clientes_encontrados[idx]
+        cliente_seleccionado["id"] = sel["id"]
+        cliente_seleccionado["nombre"] = sel["nombre"]
+        lbl_cliente_actual.configure(text=f"Seleccionado: {cliente_seleccionado['nombre']}")
+
+def ventana_nuevo_cliente():
+    top = ctk.CTkToplevel()
+    top.title("Nuevo Cliente")
+    top.geometry("300x350")
+    top.attributes("-topmost", True)
+
+    campos = {}
+    for txt in ["Nombre", "Apellido", "DNI", "Correo"]:
+        ctk.CTkEntry(top, placeholder_text=txt).pack(pady=5, padx=20, fill="x")
+        campos[txt] = top.winfo_children()[-1]
+
+    def guardar():
+        vals = [campos[k].get() for k in ["Nombre", "Apellido", "DNI", "Correo"]]
+        if not all(vals[:3]): # Validar 3 primeros obligatorios
+            messagebox.showwarning("Faltan datos", "Nombre, Apellido y DNI requeridos", parent=top)
+            return
+
+        conn = db_connector.get_connection()
+        if not conn: return
+        try:
+            cursor = conn.cursor()
+            id_new = cursor.var(oracledb.NUMBER)
+            cursor.execute("INSERT INTO clientes (nombre, apellido, dni, correo) VALUES (:1,:2,:3,:4) RETURNING id_cliente INTO :5", vals + [id_new])
+            conn.commit()
+            
+            nuevo_id = id_new.getvalue()[0]
+            cliente_seleccionado["id"] = nuevo_id
+            cliente_seleccionado["nombre"] = f"{vals[0]} {vals[1]}"
+            lbl_cliente_actual.configure(text=f"Seleccionado: {cliente_seleccionado['nombre']}")
+            top.destroy()
+            messagebox.showinfo("Éxito", "Cliente registrado y seleccionado.")
+        except Exception as e:
+            messagebox.showerror("Error", str(e), parent=top)
+        finally:
+            db_connector.release_connection(conn)
+
+    ctk.CTkButton(top, text="Guardar", command=guardar, fg_color="#27AE60").pack(pady=20)
+
+def agregar_producto():
+    id_p = entry_id_prod.get().strip()
+    cant_p = entry_cantidad.get().strip()
+    if not id_p or not cant_p: return
+
+    conn = db_connector.get_connection()
+    if not conn: return
+    try:
+        cursor = conn.cursor()
+        # Consultamos precio y stock
+        cursor.execute("SELECT nombre, precio, stock FROM productos WHERE id_producto = :1", [id_p])
+        row = cursor.fetchone()
+        
+        if row:
+            cant = int(cant_p)
+            if row[2] < cant:
+                messagebox.showwarning("Stock", f"Solo quedan {row[2]} unidades.")
+                return
+            
+            subtotal = row[1] * cant
+            item = {"id": int(id_p), "nombre": row[0], "precio": row[1], "cantidad": cant, "subtotal": subtotal}
+            carrito_productos.append(item)
+            
+            tree_carrito.insert("", "end", values=(id_p, row[0], f"{row[1]:.2f}", cant, f"{subtotal:.2f}"))
+            lbl_total_valor.configure(text=f"$ {sum(i['subtotal'] for i in carrito_productos):.2f}")
+            
+            entry_id_prod.delete(0, "end")
+            entry_cantidad.delete(0, "end"); entry_cantidad.insert(0, "1")
+            entry_id_prod.focus()
+        else:
+            messagebox.showerror("Error", "Producto no encontrado")
+    except Exception as e:
+        messagebox.showerror("Error", str(e))
+    finally:
+        db_connector.release_connection(conn)
+
+def finalizar_venta_segura():
+    if not carrito_productos: return
+    total = sum(i["subtotal"] for i in carrito_productos)
+    
+    conn = db_connector.get_connection()
+    if not conn: return
+    try:
+        cursor = conn.cursor()
+        id_venta = cursor.var(oracledb.NUMBER)
+        
+        # ---------------------------------------------------------
+        # 1. BLOQUE OBLIGATORIO (INSERTS BÁSICOS)
+        # Este bloque funciona SIEMPRE, con o sin triggers.
+        # ---------------------------------------------------------
+        
+        # Creamos la venta
+        cursor.execute("""
+            INSERT INTO ventas (id_cliente, id_empleado, total) 
+            VALUES (:1, :2, :3) 
+            RETURNING id_venta INTO :4
+        """, [cliente_seleccionado["id"], DEFAULT_EMPLEADO_ID, total, id_venta])
+        
+        venta_generada = id_venta.getvalue()[0]
+
+        # Insertamos cada detalle
+        for item in carrito_productos:
+            cursor.execute("""
+                INSERT INTO detalle_venta (id_venta, id_producto, cantidad, subtotal)
+                VALUES (:1, :2, :3, :4)
+            """, [venta_generada, item["id"], item["cantidad"], item["subtotal"]])
+
+            # ---------------------------------------------------------
+            # 2. BLOQUE DE MANTENIMIENTO MANUAL
+            # BORRAR SOLAMENTE ESTAS 2 LÍNEAS de abajo para evitar descontar doble.
+            # ---------------------------------------------------------
+            sql_update = "UPDATE productos SET stock = stock - :1 WHERE id_producto = :2"
+            cursor.execute(sql_update, [item["cantidad"], item["id"]])
+            # ---------------------------------------------------------
+
+        conn.commit()
+        messagebox.showinfo("Venta Exitosa", f"Venta {int(venta_generada)} registrada.")
+        
+        # Limpieza
+        carrito_productos.clear()
+        for item in tree_carrito.get_children(): tree_carrito.delete(item)
+        lbl_total_valor.configure(text="$ 0.00")
+
+    except Exception as e:
+        conn.rollback()
+        messagebox.showerror("Error", f"No se pudo registrar la venta: {e}")
+    finally:
+        db_connector.release_connection(conn)
