@@ -20,6 +20,3 @@ Thumbs.db
 # Logs
 *.log
 
-# ---- ¡IMPORTANTE! ----
-# Ignorar el archivo de conector real con nuestras contraseñas
-db/db_connector.py
