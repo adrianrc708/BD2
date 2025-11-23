@@ -1,10 +1,64 @@
 import flet as ft
 from db import db_connector
 import hashlib
+import oracledb
 
 
 def vista_empleados(page: ft.Page):
     estado = {"id": 0, "modo_edicion": False}
+
+    # ==================================================
+    # HELPER: MOSTRAR ALERTA MODAL (CORREGIDO)
+    # ==================================================
+    def mostrar_alerta_bd(titulo, mensaje):
+        contenido_dialogo = ft.Container(
+            width=400,
+            content=ft.Column([
+                # Encabezado Rojo Oscuro
+                ft.Container(
+                    bgcolor=ft.Colors.RED_900,
+                    padding=15,
+                    border_radius=ft.border_radius.only(top_left=12, top_right=12),
+                    content=ft.Row([
+                        ft.Icon(ft.Icons.GPP_BAD, color="white", size=28),
+                        ft.Text(titulo, color="white", weight="bold", size=18)
+                    ], spacing=10, alignment=ft.MainAxisAlignment.CENTER)
+                ),
+                # Cuerpo del Mensaje
+                ft.Container(
+                    padding=20,
+                    bgcolor="white",
+                    border_radius=ft.border_radius.only(bottom_left=12, bottom_right=12),
+                    content=ft.Column([
+                        ft.Text("La Base de Datos rechazó la operación:", weight="bold", color=ft.Colors.RED_900),
+                        ft.Text(mensaje, size=15, color=ft.Colors.GREY_800, text_align=ft.TextAlign.CENTER),
+                        ft.Divider(height=20, color="transparent"),
+                        ft.ElevatedButton(
+                            "ENTENDIDO",
+                            style=ft.ButtonStyle(
+                                # CORRECCIÓN AQUÍ: Se usa ControlState en lugar de MaterialState
+                                bgcolor={ft.ControlState.DEFAULT: ft.Colors.RED_800,
+                                         ft.ControlState.HOVERED: ft.Colors.RED_900},
+                                color="white",
+                                shape=ft.RoundedRectangleBorder(radius=8)
+                            ),
+                            width=float("inf"),
+                            height=45,
+                            on_click=lambda e: page.close(dlg_alerta)
+                        )
+                    ])
+                )
+            ], spacing=0)
+        )
+
+        dlg_alerta = ft.AlertDialog(
+            content=contenido_dialogo,
+            modal=True,
+            bgcolor=ft.Colors.TRANSPARENT,
+            content_padding=0,
+            shape=ft.RoundedRectangleBorder(radius=12)
+        )
+        page.open(dlg_alerta)
 
     # --- CONTROLES FORMULARIO ---
     lbl_titulo = ft.Text("Nuevo Empleado", size=18, weight="bold", color=ft.Colors.INDIGO_800)
@@ -95,9 +149,21 @@ def vista_empleados(page: ft.Page):
                         [txt_nombre.value, txt_apellido.value, txt_cargo.value, float(txt_salario.value),
                          txt_usuario.value.upper(), estado["id"]])
             conn.commit()
-            limpiar();
-            cargar_tabla();
+            limpiar()
+            cargar_tabla()
             mostrar_snack("Operación Exitosa", "green")
+
+        except oracledb.DatabaseError as e:
+            error_obj, = e.args
+            # APROVECHAMIENTO 100% CON DIALOGO VISUAL
+            if error_obj.code == 20003:
+                mostrar_alerta_bd("Violación de Regla Salarial",
+                                  "El salario ingresado es inferior al mínimo legal (1025).")
+            elif error_obj.code == 1:
+                mostrar_alerta_bd("Usuario Duplicado", "El usuario de aplicación ya existe en el sistema.")
+            else:
+                mostrar_alerta_bd("Error de Base de Datos", f"Código {error_obj.code}\n{error_obj.message}")
+
         except Exception as ex:
             mostrar_snack(str(ex), "red")
         finally:
@@ -191,28 +257,30 @@ def vista_empleados(page: ft.Page):
             db_connector.release_connection(conn)
 
     def editar(r):
-        estado["id"] = r[0];
+        estado["id"] = r[0]
         estado["modo_edicion"] = True
         txt_nombre.value, txt_apellido.value, txt_cargo.value = r[1], r[2], r[3]
         txt_salario.value, txt_usuario.value = str(r[4]), r[5]
-        lbl_titulo.value = "Editar Empleado";
+        lbl_titulo.value = "Editar Empleado"
         btn_guardar.text = "ACTUALIZAR"
         page.update()
 
     def limpiar():
-        estado["id"] = 0;
+        estado["id"] = 0
         estado["modo_edicion"] = False
-        txt_nombre.value = "";
-        txt_apellido.value = "";
-        txt_usuario.value = "";
-        txt_pass.value = "";
+        txt_nombre.value = ""
+        txt_apellido.value = ""
+        txt_usuario.value = ""
+        txt_pass.value = ""
         txt_salario.value = ""
-        lbl_titulo.value = "Nuevo Empleado";
-        btn_guardar.text = "GUARDAR";
+        lbl_titulo.value = "Nuevo Empleado"
+        btn_guardar.text = "GUARDAR"
         page.update()
 
     def mostrar_snack(t, c):
-        page.snack_bar = ft.SnackBar(ft.Text(t), bgcolor=c); page.snack_bar.open = True; page.update()
+        page.snack_bar = ft.SnackBar(ft.Text(t), bgcolor=c)
+        page.snack_bar.open = True
+        page.update()
 
     # BOTONES
     btn_guardar = ft.ElevatedButton("GUARDAR", bgcolor="green", color="white", height=45, width=float("inf"),

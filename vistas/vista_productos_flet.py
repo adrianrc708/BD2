@@ -1,15 +1,68 @@
 import flet as ft
 from db import db_connector
 import datetime
-
+import oracledb
 
 def vista_productos(page: ft.Page):
-    # --- ESTADO ---
     estado = {
-        "id": 0,  # 0=Nuevo, >0=Editando
-        "fecha_venc": None,  # Objeto datetime
-        "modo_edicion": False  # Para controlar visuales
+        "id": 0,
+        "fecha_venc": None,
+        "modo_edicion": False
     }
+
+    # ==================================================
+    # HELPER: MOSTRAR ALERTA MODAL (CORREGIDO)
+    # ==================================================
+    def mostrar_alerta_error(titulo, mensaje):
+        contenido_dialogo = ft.Container(
+            width=400,
+            content=ft.Column([
+                # Encabezado Rojo
+                ft.Container(
+                    bgcolor=ft.Colors.RED_700,
+                    padding=15,
+                    border_radius=ft.border_radius.only(top_left=12, top_right=12),
+                    content=ft.Row([
+                        ft.Icon(ft.Icons.ERROR_OUTLINE, color="white", size=28),
+                        ft.Text(titulo, color="white", weight="bold", size=18)
+                    ], spacing=10, alignment=ft.MainAxisAlignment.CENTER)
+                ),
+                # Cuerpo del Mensaje
+                ft.Container(
+                    padding=20,
+                    bgcolor="white",
+                    border_radius=ft.border_radius.only(bottom_left=12, bottom_right=12),
+                    content=ft.Column([
+                        ft.Text(mensaje, size=15, color=ft.Colors.GREY_800, text_align=ft.TextAlign.CENTER),
+                        ft.Divider(height=20, color="transparent"),
+                        ft.ElevatedButton(
+                            "ENTENDIDO",
+                            style=ft.ButtonStyle(
+                                # CORRECCIÓN AQUÍ: Se usa ControlState
+                                bgcolor={ft.ControlState.DEFAULT: ft.Colors.RED_600, ft.ControlState.HOVERED: ft.Colors.RED_700},
+                                color="white",
+                                shape=ft.RoundedRectangleBorder(radius=8)
+                            ),
+                            width=float("inf"),
+                            height=45,
+                            on_click=lambda e: page.close(dlg_error)
+                        )
+                    ])
+                )
+            ], spacing=0)
+        )
+
+        dlg_error = ft.AlertDialog(
+            content=contenido_dialogo,
+            modal=True,
+            bgcolor=ft.Colors.TRANSPARENT,
+            content_padding=0,
+            shape=ft.RoundedRectangleBorder(radius=12)
+        )
+        page.open(dlg_error)
+
+    # ... (Resto del código idéntico) ...
+    # ... (Incluyo el resto para que sea un archivo completo y no falle)
 
     # ==================================================
     # 1. CONTROLES DEL PANEL LATERAL (FORMULARIO)
@@ -19,7 +72,6 @@ def vista_productos(page: ft.Page):
     lbl_info_bloqueada = ft.Text("Edición: Datos base bloqueados por seguridad.", size=11, color="grey", visible=False)
 
     # -- Campos de Datos Base --
-    # CORRECCIÓN: Agregamos expand=True a Categoría y Marca para que se alineen bien
     txt_nombre = ft.TextField(label="Nombre", height=40, text_size=13, content_padding=10)
     txt_categoria = ft.TextField(label="Categoría", height=40, text_size=13, content_padding=10, expand=True)
     txt_marca = ft.TextField(label="Marca", height=40, text_size=13, content_padding=10, expand=True)
@@ -73,7 +125,7 @@ def vista_productos(page: ft.Page):
     )
 
     tabla = ft.DataTable(
-        width=float("inf"),  # IMPORTANTE: Fuerza a la tabla a usar todo el ancho disponible
+        width=float("inf"),
         columns=[
             ft.DataColumn(ft.Text("ID", weight="bold")),
             ft.DataColumn(ft.Text("Producto", weight="bold")),
@@ -116,7 +168,6 @@ def vista_productos(page: ft.Page):
             ft.Divider(height=15),
             ft.Text("DATOS BASE", color="grey", size=11, weight="bold"),
             txt_nombre,
-            # CORRECCIÓN: Ahora Categoría y Marca están en la misma fila y se expanden
             ft.Row([txt_categoria, txt_marca], spacing=10),
             txt_modelo,
             txt_descripcion,
@@ -130,11 +181,10 @@ def vista_productos(page: ft.Page):
     panel_izquierdo = ft.Container(
         expand=True,
         bgcolor="white",
-        padding=15,  # Reducido un poco el padding para dar más espacio a la tabla
+        padding=15,
         border_radius=10,
         shadow=ft.BoxShadow(blur_radius=10, color=ft.Colors.BLACK12),
         content=ft.Column([
-            # Encabezado limpio (SIN botón Nuevo Producto)
             ft.Row([
                 ft.Icon(ft.Icons.INVENTORY_2, color=ft.Colors.INDIGO_900),
                 ft.Text("Inventario General", size=24, weight="bold", color=ft.Colors.BLUE_GREY_800),
@@ -291,7 +341,7 @@ def vista_productos(page: ft.Page):
 
             if estado["id"] == 0:
                 cur.callproc("pkg_gestion_productos.sp_registrar", params)
-                mostrar_snack("Producto Creado", "green")
+                mostrar_snack("Producto Creado Exitosamente", "green")
             else:
                 params.insert(0, estado["id"])
                 cur.callproc("pkg_gestion_productos.sp_modificar", params)
@@ -301,8 +351,21 @@ def vista_productos(page: ft.Page):
             configurar_panel(modo_edicion=False)
             cargar_tabla()
 
+        except oracledb.DatabaseError as e:
+            error_obj, = e.args
+            # APROVECHAMIENTO AL 100% CON DIALOGO VISUAL MEJORADO
+            if error_obj.code == 20010:
+                mensaje_completo = error_obj.message.split(': ', 1)[
+                    1] if ': ' in error_obj.message else error_obj.message
+                mensaje_limpio = mensaje_completo.splitlines()[0]
+
+                mostrar_alerta_error("Producto Duplicado", mensaje_limpio)
+                mostrar_alerta_error("Producto Duplicado", mensaje_limpio)
+            else:
+                mostrar_alerta_error("Error de Base de Datos", f"Código {error_obj.code}\n{error_obj.message}")
+
         except Exception as ex:
-            mostrar_snack(f"Error BD: {ex}", "red")
+            mostrar_snack(f"Error inesperado: {ex}", "red")
         finally:
             db_connector.release_connection(conn)
 
