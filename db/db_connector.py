@@ -3,8 +3,8 @@ import hashlib
 from tkinter import messagebox
 
 # --- CONFIGURACIÓN MAESTRA (Dueño del Esquema) ---
-DB_USER = "---"
-DB_PASS = "---"
+DB_USER = "adrian"
+DB_PASS = "adrian_pwd"
 DB_DSN = "localhost:1521/XE"
 
 connection_pool = None
