@@ -173,7 +173,6 @@ def agregar_producto():
         row = cur.fetchone()
         if row:
             cant = int(cant_p)
-            # Validación preventiva (opcional, el trigger también protege)
             if row[2] < cant:
                 messagebox.showwarning("Stock", f"Stock insuficiente. Disponible: {row[2]}")
                 return
