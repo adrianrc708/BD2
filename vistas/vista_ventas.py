@@ -195,7 +195,9 @@ def agregar_producto():
 
 def finalizar_venta_segura():
     if not carrito_productos: return
-    total = sum(i["subtotal"] for i in carrito_productos)
+    # Calculamos el total solo para validaciones visuales, pero NO lo enviamos a la BD
+    total_visual = sum(i["subtotal"] for i in carrito_productos)
+
     conn = db_connector.get_connection()
     if not conn: return
     try:
@@ -203,23 +205,21 @@ def finalizar_venta_segura():
         id_venta = cursor.var(oracledb.NUMBER)
 
         # 1. Crear Venta
+        # CORRECCIÓN: Enviamos 0 en lugar de 'total' para que el Trigger sume desde cero.
         cursor.execute("""
                        INSERT INTO ventas (id_cliente, id_empleado, total)
                        VALUES (:1, :2, :3) RETURNING id_venta
                        INTO :4
-                       """, [cliente_seleccionado["id"], DEFAULT_EMPLEADO_ID, total, id_venta])
+                       """, [cliente_seleccionado["id"], DEFAULT_EMPLEADO_ID, 0, id_venta])
 
         venta_generada = id_venta.getvalue()[0]
 
-        # 2. Insertar Detalle (Esto dispara el TRIGGER 'trg_control_stock' en la BD)
-        #    El trigger se encargará de restar el stock y validar si alcanza.
+        # 2. Insertar Detalle (Esto dispara el TRIGGER 'trg_actualiza_total' en Oracle)
         for item in carrito_productos:
             cursor.execute("""
                            INSERT INTO detalle_venta (id_venta, id_producto, cantidad, subtotal)
                            VALUES (:1, :2, :3, :4)
                            """, [venta_generada, item["id"], item["cantidad"], item["subtotal"]])
-
-        # ¡IMPORTANTE! YA NO HACEMOS UPDATE MANUAL A PRODUCTOS AQUÍ.
 
         conn.commit()
         messagebox.showinfo("Venta Exitosa", f"Venta {int(venta_generada)} registrada.")
@@ -229,12 +229,11 @@ def finalizar_venta_segura():
 
     except Exception as e:
         conn.rollback()
-        # Si el trigger falla (ej. stock insuficiente), el error vendrá aquí.
         err_msg = str(e)
         if "ORA-20002" in err_msg:
-            messagebox.showerror("Stock Insuficiente", "El trigger bloqueó la venta: Stock insuficiente en la BD.")
+            messagebox.showerror("Stock Insuficiente", "El trigger bloqueó la venta: Stock insuficiente.")
         elif "ORA-20005" in err_msg:
-            messagebox.showerror("Producto Vencido", "El trigger bloqueó la venta: Intenta vender un producto vencido.")
+            messagebox.showerror("Producto Vencido", "El trigger bloqueó la venta: Producto vencido.")
         else:
             messagebox.showerror("Error en Venta", f"Error: {e}")
     finally:
