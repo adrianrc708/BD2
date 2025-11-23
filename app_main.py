@@ -1,4 +1,5 @@
 import customtkinter as ctk
+from tkinter import messagebox
 from db import db_connector
 
 from vistas import vista_productos
@@ -6,124 +7,171 @@ from vistas import vista_ventas
 from vistas import vista_reportes
 
 
-class App:
-    def __init__(self, root):
-        self.root = root
+# --- CLASE PRINCIPAL QUE GESTIONA TODO ---
+class MainApp:
+    def __init__(self):
+        # Configuración inicial única de la ventana
+        ctk.set_appearance_mode("light")
+        self.root = ctk.CTk()
         self.root.title("AppTiendaOracle")
-        self.root.geometry("1100x720")
 
+        # Iniciamos mostrando el Login
+        self.mostrar_login()
+
+        # Protocolo de cierre seguro
+        self.root.protocol("WM_DELETE_WINDOW", self.cerrar_aplicacion)
+        self.root.mainloop()
+
+    def cerrar_aplicacion(self):
+        """Cierra la conexión a BD y la ventana"""
+        db_connector.close_connection_pool()
+        self.root.destroy()
+
+    # --- VISTA DE LOGIN ---
+    def mostrar_login(self):
+        self.limpiar_ventana()
+        self.root.geometry("400x500")
+        self.root.title("Acceso - AppTiendaOracle")
+
+        # Frame Central del Login
+        frame = ctk.CTkFrame(self.root, width=320, height=360, corner_radius=15)
+        frame.place(relx=0.5, rely=0.5, anchor="center")
+
+        ctk.CTkLabel(frame, text="Iniciar Sesión", font=ctk.CTkFont(size=26, weight="bold")).place(relx=0.5, rely=0.15,
+                                                                                                   anchor="center")
+
+        user_entry = ctk.CTkEntry(frame, width=220, placeholder_text="Usuario (ej. adrian)")
+        user_entry.place(relx=0.5, rely=0.35, anchor="center")
+
+        pass_entry = ctk.CTkEntry(frame, width=220, placeholder_text="Contraseña", show="*")
+        pass_entry.place(relx=0.5, rely=0.5, anchor="center")
+
+        # Función interna para procesar el login
+        def intentar_login():
+            u = user_entry.get()
+            p = pass_entry.get()
+            if not u or not p:
+                messagebox.showwarning("Datos", "Ingrese usuario y contraseña")
+                return
+
+            if db_connector.login_y_conectar(u, p):
+                # Si conecta, cambiamos a la vista principal
+                self.mostrar_dashboard(u)
+
+        btn_login = ctk.CTkButton(frame, text="INGRESAR", width=220, height=40, command=intentar_login)
+        btn_login.place(relx=0.5, rely=0.7, anchor="center")
+
+    # --- VISTA DEL DASHBOARD (APP PRINCIPAL) ---
+    def mostrar_dashboard(self, usuario):
+        self.limpiar_ventana()
+        self.root.geometry("1100x720")
+        self.root.title(f"AppTiendaOracle - Usuario: {usuario.upper()}")
+
+        # Inicializamos la lógica del Dashboard pasándole el root actual
+        DashboardLogic(self.root, usuario, self.logout)
+
+    def limpiar_ventana(self):
+        """Elimina todos los widgets de la ventana actual sin cerrarla"""
+        for widget in self.root.winfo_children():
+            widget.destroy()
+
+    def logout(self):
+        """Cierra sesión y vuelve al login"""
+        db_connector.close_connection_pool()
+        self.mostrar_login()
+
+
+# --- LÓGICA DEL DASHBOARD (Separada para orden) ---
+class DashboardLogic:
+    def __init__(self, root, usuario, logout_callback):
+        self.root = root
+        self.usuario_actual = usuario.upper()
+        self.logout_callback = logout_callback
+        self.es_admin = self.verificar_permisos_admin()
+
+        # Configuración del Grid
         self.root.grid_columnconfigure(1, weight=1)
         self.root.grid_rowconfigure(1, weight=1)
 
-        self.header_frame = ctk.CTkFrame(root, height=60, fg_color="#F8659B", corner_radius=0)
+        # Header
+        self.header_frame = ctk.CTkFrame(root, height=60, fg_color="#2C3E50", corner_radius=0)
         self.header_frame.grid(row=0, column=0, columnspan=2, sticky="new")
+        ctk.CTkLabel(self.header_frame, text=f"Sistema de Tienda ({self.usuario_actual})",
+                     font=ctk.CTkFont(size=20, weight="bold"), text_color="white").place(relx=0.5, rely=0.5,
+                                                                                         anchor="center")
 
-        self.header_label = ctk.CTkLabel(self.header_frame, text="AppTiendaOracle",
-                                         font=ctk.CTkFont(size=20, weight="bold"),
-                                         text_color="white")
-        self.header_label.place(relx=0.5, rely=0.5, anchor="center")
-
+        # Sidebar
         self.sidebar_frame = ctk.CTkFrame(root, width=250, fg_color="#F2F2F2", corner_radius=0)
         self.sidebar_frame.grid(row=1, column=0, sticky="nsw")
-        self.sidebar_frame.grid_rowconfigure(4, weight=1)
+        self.sidebar_frame.grid_rowconfigure(5, weight=1)
 
-        self.sidebar_label = ctk.CTkLabel(self.sidebar_frame, text="Navegación",
-                                          font=ctk.CTkFont(size=18, weight="bold"),
-                                          text_color="#333333")
-        self.sidebar_label.grid(row=0, column=0, padx=20, pady=(20, 10))
+        ctk.CTkLabel(self.sidebar_frame, text="Menú Principal", font=ctk.CTkFont(size=18, weight="bold")).grid(row=0,
+                                                                                                               column=0,
+                                                                                                               pady=20)
 
-        self.btn_productos = ctk.CTkButton(self.sidebar_frame, text="Gestión de Productos",
-                                           command=self.show_products_frame,
-                                           fg_color="white", text_color="black",
-                                           hover_color="#E5E5E5", corner_radius=8,
-                                           font=ctk.CTkFont(size=14))
-        self.btn_productos.grid(row=1, column=0, padx=20, pady=10, sticky="ew")
+        # Botones
+        self.crear_botones_menu()
 
-        self.btn_ventas = ctk.CTkButton(self.sidebar_frame, text="Registrar Venta",
-                                        command=self.show_sales_frame,
-                                        fg_color="white", text_color="black",
-                                        hover_color="#E5E5E5", corner_radius=8,
-                                        font=ctk.CTkFont(size=14))
-        self.btn_ventas.grid(row=2, column=0, padx=20, pady=10, sticky="ew")
-
-        self.btn_reportes = ctk.CTkButton(self.sidebar_frame, text="Reportes",
-                                          command=self.show_reports_frame,
-                                          fg_color="white", text_color="black",
-                                          hover_color="#E5E5E5", corner_radius=8,
-                                          font=ctk.CTkFont(size=14))
-        self.btn_reportes.grid(row=3, column=0, padx=20, pady=10, sticky="ew")
-
-        self.btn_volver = ctk.CTkButton(self.sidebar_frame, text="Volver al Panel",
-                                        command=self.show_welcome_frame,
-                                        fg_color="#7F8C8D", text_color="white",
-                                        hover_color="#95A5A6", corner_radius=8,
-                                        font=ctk.CTkFont(size=14))
-        self.btn_volver.grid(row=5, column=0, padx=20, pady=20, sticky="ews")
-
+        # Área de Contenido
         self.content_frame = ctk.CTkFrame(root, fg_color="white", corner_radius=0)
-        self.content_frame.grid(row=1, column=1, sticky="nsew", padx=0, pady=0)
+        self.content_frame.grid(row=1, column=1, sticky="nsew")
 
-        self.show_welcome_frame()
+        # Mensaje de Bienvenida
+        ctk.CTkLabel(self.content_frame, text=f"Bienvenido, {self.usuario_actual}", font=ctk.CTkFont(size=30)).place(
+            relx=0.5, rely=0.4, anchor="center")
 
-    def clear_content_frame(self):
-        for widget in self.content_frame.winfo_children():
-            widget.destroy()
+    def crear_botones_menu(self):
+        # Botón Ventas (Para todos)
+        ctk.CTkButton(self.sidebar_frame, text="🛒 Registrar Venta", command=self.ver_ventas, fg_color="#2980B9").grid(
+            row=1, column=0, padx=20, pady=10, sticky="ew")
 
-    def show_welcome_frame(self):
-        self.clear_content_frame()
+        # Botones Admin
+        if self.es_admin:
+            ctk.CTkButton(self.sidebar_frame, text="📦 Gestión Productos", command=self.ver_productos,
+                          fg_color="#27AE60").grid(row=2, column=0, padx=20, pady=10, sticky="ew")
+            ctk.CTkButton(self.sidebar_frame, text="📊 Reportes", command=self.ver_reportes, fg_color="#8E44AD").grid(
+                row=3, column=0, padx=20, pady=10, sticky="ew")
+        else:
+            ctk.CTkLabel(self.sidebar_frame, text="[Modo Vendedor]\nAcceso Limitado", text_color="gray").grid(row=4,
+                                                                                                              column=0,
+                                                                                                              pady=20)
 
-        self.content_frame.grid_columnconfigure(0, weight=1)
-        self.content_frame.grid_rowconfigure(0, weight=1)
+        # Botón Salir
+        ctk.CTkButton(self.sidebar_frame, text="Cerrar Sesión", fg_color="#C0392B", command=self.logout_callback).grid(
+            row=5, column=0, padx=20, pady=20, sticky="s")
 
-        placeholder_frame = ctk.CTkFrame(self.content_frame, fg_color="transparent")
-        placeholder_frame.grid(row=0, column=0, sticky="nsew")
+    def verificar_permisos_admin(self):
+        if self.usuario_actual == 'ADRIAN': return True
+        conn = db_connector.get_connection()
+        if not conn: return False
+        try:
+            cur = conn.cursor()
+            cur.execute("SELECT role FROM session_roles")
+            roles = [r[0] for r in cur.fetchall()]
+            # Si tiene rol vendedor, NO es admin
+            if 'ROL_VENDEDOR' in roles: return False
+            return True
+        except:
+            return False
+        finally:
+            db_connector.release_connection(conn)
 
-        placeholder_frame.columnconfigure(0, weight=1)
-        placeholder_frame.rowconfigure(0, weight=1)
-        placeholder_frame.rowconfigure(1, weight=1)
-        placeholder_frame.rowconfigure(2, weight=1)
+    def limpiar_contenido(self):
+        for widget in self.content_frame.winfo_children(): widget.destroy()
 
-        icon_label = ctk.CTkLabel(placeholder_frame, text="🗃️", font=ctk.CTkFont(size=100))
-        icon_label.grid(row=0, column=0, pady=(0, 20), sticky="s")
-
-        welcome_label = ctk.CTkLabel(placeholder_frame, text="Sistema de Gestión",
-                                     font=ctk.CTkFont(size=32, weight="bold"),
-                                     text_color="#333333")
-        welcome_label.grid(row=1, column=0, sticky="n")
-
-        info_label = ctk.CTkLabel(placeholder_frame,
-                                  text="Seleccione una opción del menú de la izquierda para comenzar.",
-                                  font=ctk.CTkFont(size=16),
-                                  text_color="#666666")
-        info_label.grid(row=2, column=0, pady=(10, 0), sticky="n")
-
-    def show_products_frame(self):
-        self.clear_content_frame()
-        vista_productos.create_products_view(self.content_frame)
-
-    def show_sales_frame(self):
-        self.clear_content_frame()
+    def ver_ventas(self):
+        self.limpiar_contenido()
         vista_ventas.create_sales_view(self.content_frame)
 
-    def show_reports_frame(self):
-        self.clear_content_frame()
+    def ver_productos(self):
+        self.limpiar_contenido()
+        vista_productos.create_products_view(self.content_frame)
+
+    def ver_reportes(self):
+        self.limpiar_contenido()
         vista_reportes.create_reports_view(self.content_frame)
 
 
-def on_app_close(root_window):
-    print("Cerrando la aplicación... cerrando pool de conexiones.")
-    db_connector.close_connection_pool()
-    root_window.destroy()
-
-
 if __name__ == "__main__":
-    ctk.set_appearance_mode("light")
-    ctk.set_default_color_theme("blue")
-
-    db_connector.init_connection_pool()
-
-    root = ctk.CTk()
-    app = App(root)
-
-    root.protocol("WM_DELETE_WINDOW", lambda: on_app_close(root))
-    root.mainloop()
+    # Arrancamos la app
+    MainApp()
