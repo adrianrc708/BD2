@@ -19,4 +19,4 @@ Thumbs.db
 
 # Logs
 *.log
-
+db/db_connector.py
