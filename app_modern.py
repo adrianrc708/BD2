@@ -1,7 +1,8 @@
 import flet as ft
 from db import db_connector
 from vistas.vista_ventas_flet import vista_ventas
-
+from vistas.vista_productos_flet import vista_productos
+from vistas.vista_reportes_flet import vista_reportes
 
 def main(page: ft.Page):
     # --- CONFIGURACIÓN GLOBAL ---
@@ -75,10 +76,10 @@ def main(page: ft.Page):
                 control_vista = vista_ventas(page)
                 if btn_ventas_ref.current: btn_ventas_ref.current.bgcolor = ft.Colors.INDIGO_600
             elif nombre == "productos":
-                control_vista = ft.Text("Módulo de Productos (En construcción)", size=20)
+                control_vista = vista_productos(page)  # <--- CAMBIO AQUÍ
                 if btn_prod_ref.current: btn_prod_ref.current.bgcolor = ft.Colors.INDIGO_600
             elif nombre == "reportes":
-                control_vista = ft.Text("Módulo de Reportes (En construcción)", size=20)
+                control_vista = vista_reportes(page)  # <--- CAMBIO AQUÍ
                 if btn_rep_ref.current: btn_rep_ref.current.bgcolor = ft.Colors.INDIGO_600
 
             contenedor_vistas.content = control_vista
