@@ -1,8 +1,10 @@
+
+
 -----------------------------------------------------------------------------
 -- 1. LIMPIEZA Y PREPARACIÓN (Opcional, por si reinicias)
 -----------------------------------------------------------------------------
 ALTER SESSION SET "_ORACLE_SCRIPT" = TRUE;
-CREATE TABLESPACE ts_tienda DATAFILE 'C:\app\...\ts_tienda.dbf' SIZE 20M AUTOEXTEND ON NEXT 5M MAXSIZE UNLIMITED;
+-- CREATE TABLESPACE ts_tienda DATAFILE 'C:\app\...\ts_tienda.dbf' SIZE 20M AUTOEXTEND ON NEXT 5M MAXSIZE UNLIMITED;
 
 -- Creación de Usuario
 CREATE USER adrian IDENTIFIED BY adrian_pwd DEFAULT TABLESPACE ts_tienda QUOTA UNLIMITED ON ts_tienda;
@@ -217,12 +219,16 @@ END pkg_gestion_productos;
 -- 5. PAQUETE DE REPORTES (OPTIMIZADO CON SYS_REFCURSOR)
 -----------------------------------------------------------------------------
 CREATE OR REPLACE PACKAGE pkg_reportes AS
-  -- Estos reportes ahora devuelven cursores reales a Python
   PROCEDURE rep_ventas_por_mes (p_cursor OUT SYS_REFCURSOR);
   PROCEDURE rep_productos_stock_bajo (p_limite IN NUMBER, p_cursor OUT SYS_REFCURSOR);
   PROCEDURE rep_productos_mas_vendidos (p_cursor OUT SYS_REFCURSOR);
   PROCEDURE rep_valor_inventario (p_cursor OUT SYS_REFCURSOR);
   PROCEDURE rep_auditoria_cambios (p_cursor OUT SYS_REFCURSOR);
+  PROCEDURE rep_mejores_clientes (p_cursor OUT SYS_REFCURSOR);       -- Reporte 6
+  PROCEDURE rep_empleados_ingresos (p_cursor OUT SYS_REFCURSOR);     -- Reporte 7
+  PROCEDURE rep_ventas_por_categoria (p_cursor OUT SYS_REFCURSOR);   -- Reporte 8
+  PROCEDURE rep_productos_sin_ventas (p_cursor OUT SYS_REFCURSOR);   -- Reporte 9 (Usa LEFT JOIN)
+  PROCEDURE rep_resumen_estadistico (p_mes IN VARCHAR2 DEFAULT NULL, p_id_empleado IN NUMBER DEFAULT NULL, p_cursor OUT SYS_REFCURSOR);
 END pkg_reportes;
 /
 
@@ -274,6 +280,97 @@ CREATE OR REPLACE PACKAGE BODY pkg_reportes AS
       JOIN productos p ON h.id_producto = p.id_producto
       ORDER BY h.fecha_cambio DESC;
   END rep_auditoria_cambios;
+
+  PROCEDURE rep_mejores_clientes (p_cursor OUT SYS_REFCURSOR) IS
+  BEGIN
+    OPEN p_cursor FOR
+      SELECT c.nombre, c.apellido, -- DEVUELVE 4 COLUMNAS
+             COUNT(v.id_venta) as cantidad_compras,
+             NVL(SUM(v.total), 0) as total_gastado
+      FROM clientes c
+      JOIN ventas v ON c.id_cliente = v.id_cliente
+      GROUP BY c.id_cliente, c.nombre, c.apellido
+      ORDER BY total_gastado DESC
+      FETCH FIRST 10 ROWS ONLY;
+  END rep_mejores_clientes;
+
+  -- 7. Rendimiento Empleados (Demuestra JOIN con tabla EMPLEADOS)
+  PROCEDURE rep_empleados_ingresos (p_cursor OUT SYS_REFCURSOR) IS
+  BEGIN
+    OPEN p_cursor FOR
+      SELECT e.nombre, e.apellido, -- DEVUELVE 4 COLUMNAS
+             COUNT(v.id_venta) as ventas_realizadas,
+             NVL(SUM(v.total), 0) as dinero_generado
+      FROM empleados e
+      JOIN ventas v ON e.id_empleado = v.id_empleado
+      GROUP BY e.id_empleado, e.nombre, e.apellido
+      ORDER BY dinero_generado DESC;
+  END rep_empleados_ingresos;
+
+  -- 8. Ventas por Categoría (Análisis de Producto)
+  PROCEDURE rep_ventas_por_categoria (p_cursor OUT SYS_REFCURSOR) IS
+  BEGIN
+    OPEN p_cursor FOR
+      SELECT p.categoria,
+             COUNT(d.id_detalle) as items_vendidos,
+             NVL(SUM(d.subtotal), 0) as total_ingresos
+      FROM productos p
+      JOIN detalle_venta d ON p.id_producto = d.id_producto
+      GROUP BY p.categoria
+      ORDER BY total_ingresos DESC;
+  END rep_ventas_por_categoria;
+
+  -- 9. Productos "Hueso" (Demuestra LEFT JOIN - Productos que existen pero nadie compra)
+  PROCEDURE rep_productos_sin_ventas (p_cursor OUT SYS_REFCURSOR) IS
+  BEGIN
+    OPEN p_cursor FOR
+      SELECT p.nombre, p.stock, p.categoria
+      FROM productos p
+      LEFT JOIN detalle_venta d ON p.id_producto = d.id_producto
+      WHERE d.id_detalle IS NULL -- El truco del Left Join
+      ORDER BY p.stock DESC;
+  END rep_productos_sin_ventas;
+
+  -- 10. Resumen Estadístico (Funciones de Agregación Globales)
+  PROCEDURE rep_resumen_estadistico (
+    p_mes IN VARCHAR2 DEFAULT NULL,
+    p_id_empleado IN NUMBER DEFAULT NULL,
+    p_cursor OUT SYS_REFCURSOR
+  ) IS
+    v_ambito VARCHAR2(50);
+  BEGIN
+-- 1. Determinar el Ámbito (para la columna 'ambito' del reporte)
+    IF p_id_empleado IS NOT NULL THEN
+        -- Se busca el nombre del empleado para darle contexto al reporte
+        SELECT 'Empleado: ' || e.nombre || ' ' || e.apellido INTO v_ambito FROM empleados e WHERE id_empleado = p_id_empleado;
+    ELSIF p_mes IS NOT NULL THEN
+        v_ambito := 'Mes: ' || p_mes;
+    ELSE
+        v_ambito := 'Global';
+    END IF;
+
+-- 2. Abrir el cursor aplicando los filtros opcionales
+    OPEN p_cursor FOR
+      SELECT v_ambito as ambito,
+             ROUND(AVG(total), 2) as ticket_promedio,
+             MAX(total) as venta_maxima,
+             MIN(total) as venta_minima,
+             COUNT(*) as total_transacciones
+      FROM ventas
+      WHERE 1=1
+-- Filtro por Empleado
+        AND (p_id_empleado IS NULL OR id_empleado = p_id_empleado)
+-- Filtro por Mes/Año
+        AND (p_mes IS NULL OR TO_CHAR(fecha_venta, 'YYYY-MM') = p_mes);
+  EXCEPTION
+    WHEN NO_DATA_FOUND THEN
+-- Si no se encuentra el empleado o no hay ventas, devuelve valores en cero
+      v_ambito := 'Sin Datos / ' || v_ambito;
+      OPEN p_cursor FOR
+        SELECT v_ambito as ambito, 0, 0, 0, 0 FROM DUAL;
+    WHEN OTHERS THEN
+      RAISE_APPLICATION_ERROR(-20020, 'Error en rep_resumen_estadistico: ' || SQLERRM);
+  END rep_resumen_estadistico;
 
 END pkg_reportes;
 /
