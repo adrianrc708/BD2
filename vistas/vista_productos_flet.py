@@ -11,7 +11,7 @@ def vista_productos(page: ft.Page):
     }
 
     # ==================================================
-    # HELPER: MOSTRAR ALERTA MODAL (CORREGIDO)
+    # HELPER: MOSTRAR ALERTA MODAL 
     # ==================================================
     def mostrar_alerta_error(titulo, mensaje):
         contenido_dialogo = ft.Container(
@@ -38,7 +38,7 @@ def vista_productos(page: ft.Page):
                         ft.ElevatedButton(
                             "ENTENDIDO",
                             style=ft.ButtonStyle(
-                                # CORRECCIÓN AQUÍ: Se usa ControlState
+                                
                                 bgcolor={ft.ControlState.DEFAULT: ft.Colors.RED_600, ft.ControlState.HOVERED: ft.Colors.RED_700},
                                 color="white",
                                 shape=ft.RoundedRectangleBorder(radius=8)
@@ -61,8 +61,6 @@ def vista_productos(page: ft.Page):
         )
         page.open(dlg_error)
 
-    # ... (Resto del código idéntico) ...
-    # ... (Incluyo el resto para que sea un archivo completo y no falle)
 
     # ==================================================
     # 1. CONTROLES DEL PANEL LATERAL (FORMULARIO)
@@ -146,7 +144,7 @@ def vista_productos(page: ft.Page):
     # 3. DEFINICIÓN DE PANELES
     # ==================================================
 
-    # Panel Derecho (Formulario)
+    # Panel Derecho 
     panel_derecho = ft.Container(
         width=320,
         bgcolor="white",
@@ -353,7 +351,7 @@ def vista_productos(page: ft.Page):
 
         except oracledb.DatabaseError as e:
             error_obj, = e.args
-            # APROVECHAMIENTO AL 100% CON DIALOGO VISUAL MEJORADO
+            
             if error_obj.code == 20010:
                 mensaje_completo = error_obj.message.split(': ', 1)[
                     1] if ': ' in error_obj.message else error_obj.message
