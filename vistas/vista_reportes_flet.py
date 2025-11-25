@@ -35,7 +35,6 @@ def vista_reportes(page: ft.Page):
         label="Filtro Empleado",
         hint_text="Global (Todos)",
         width=250, text_size=13,
-        # CORRECCIÓN DE TYPO: GREEY_300 -> GREY_300
         bgcolor=ft.Colors.GREY_50, border_color=ft.Colors.GREY_300,
         options=[ft.dropdown.Option(text="Global (Todos)", key="0")],
         value="0"
@@ -103,7 +102,7 @@ def vista_reportes(page: ft.Page):
                          params,
                          ["Ámbito", "Ticket Prom. ($)", "Máximo", "Mínimo", "Total Trans."])
 
-    # 3. Botón y Contenedor de Filtros (Mejora estética y botón "Aplicar")
+    # 3. Botón y Contenedor de Filtros 
     btn_aplicar_filtro = ft.ElevatedButton(
         "APLICAR FILTRO",
         icon=ft.Icons.CHECK,
@@ -124,15 +123,14 @@ def vista_reportes(page: ft.Page):
         border_radius=8,
         bgcolor=ft.Colors.GREY_100,
         border=ft.border.all(1, ft.Colors.INDIGO_200),
-        visible=False  # Invisible por defecto
+        visible=False  
     )
 
     # ==================================================
 
-    # --- LÓGICA DE SCROLL LATERAL (CORREGIDA) ---
+    # --- LÓGICA DE SCROLL LATERAL ---
     def mover_cards(e, direccion):
         fila = fila_cards_ref.current
-        # AJUSTE FINAL: Un valor grande (1500) asegura que el final de la lista sea visible con un solo clic derecho.
         paso_scroll = 1500
 
         # Inicializar fila.offset a 0 si es None (para evitar TypeError)
@@ -214,7 +212,7 @@ def vista_reportes(page: ft.Page):
         shadow=ft.BoxShadow(blur_radius=10, color=ft.Colors.BLACK12)
     )
 
-    # --- LÓGICA PDF (sin cambios) ---
+    # --- LÓGICA PDF  ---
     def guardar_archivo_resultado(e: ft.FilePickerResultEvent):
         if not e.path:
             return
@@ -258,7 +256,7 @@ def vista_reportes(page: ft.Page):
                     data_row = list(row)
 
                     if sp_name in ('pkg_reportes.rep_mejores_clientes', 'pkg_reportes.rep_empleados_ingresos'):
-                        # Asumo que el PDF usa el PL/SQL original de 3 columnas (concatenado) o falla.
+                      
                         nombre_completo = f"{data_row[0]}" if len(data_row) == 3 else f"{data_row[0]} {data_row[1]}"
 
                         pdf.cell(ancho_col, 8, nombre_completo[:25], border=1)
@@ -298,8 +296,7 @@ def vista_reportes(page: ft.Page):
                             ["Categoría", "Items", "Ingresos ($)"])
             agregar_seccion("9. Productos Sin Ventas", "pkg_reportes.rep_productos_sin_ventas", [],
                             ["Producto", "Stock Actual", "Categoría"], False)
-
-            # El reporte 10 para PDF debe usar [None, None] para forzar el ámbito Global
+          
             agregar_seccion("10. KPIs Globales", "pkg_reportes.rep_resumen_estadistico", [None, None],
                             ["Ámbito", "Ticket Prom. ($)", "Máximo", "Mínimo", "Total Trans."])
 
@@ -327,7 +324,7 @@ def vista_reportes(page: ft.Page):
             allowed_extensions=["pdf"]
         )
 
-    # --- LÓGICA DE EJECUCIÓN DEL REPORTE (Corregida la secuencia para Flet DataTable) ---
+    # --- LÓGICA DE EJECUCIÓN DEL REPORTE ---
     def ejecutar_reporte(titulo, proc_name, params, columnas_header, es_grafico=False):
         conn = db_connector.get_connection()
         if not conn: return
@@ -424,7 +421,7 @@ def vista_reportes(page: ft.Page):
 
     # Manejadores de eventos de Reportes (llaman a la función ejecutar_reporte)
     # ------------------------------------------------------------------------------------------------------------------
-    # MANEJADORES PARA LA VISIBILIDAD DE FILTROS (CORRECCIÓN)
+    # MANEJADORES PARA LA VISIBILIDAD DE FILTROS 
     # ------------------------------------------------------------------------------------------------------------------
 
     def ocultar_filtros_kpi():
@@ -505,7 +502,7 @@ def vista_reportes(page: ft.Page):
                                ver_sin_rotacion),
             crear_card_reporte(ft.Icons.ANALYTICS_ROUNDED, "KPIs", "Resumen", ft.Colors.BLUE_GREY, ver_kpi),
         ],
-        scroll=ft.ScrollMode.HIDDEN,  # Ocultar el scrollbar inferior
+        scroll=ft.ScrollMode.HIDDEN,  
         spacing=20
     )
 
