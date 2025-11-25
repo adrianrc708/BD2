@@ -65,7 +65,7 @@ def validar_usuario_app(usuario, password_plano):
 
 def get_connection():
     global connection_pool
-    if not connection_pool: init_pool()  # Intenta reconectar si no hay pool
+    if not connection_pool: init_pool()  
     if connection_pool:
         try:
             return connection_pool.acquire()
