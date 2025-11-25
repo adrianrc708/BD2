@@ -65,7 +65,7 @@ def main(page: ft.Page):
 
             control = None
             if nombre == "ventas":
-                # SOLUCIÓN: Pasamos la sesión como argumento, no asignando propiedad
+                
                 control = vista_ventas(page, sesion_actual)
                 if btn_ventas_ref.current: btn_ventas_ref.current.bgcolor = ft.Colors.INDIGO_600
 
@@ -156,7 +156,7 @@ def main(page: ft.Page):
                 sesion_actual.update(data)
                 mostrar_dashboard()
             else:
-                lbl_error.value = data  # Mensaje de error
+                lbl_error.value = data  
                 lbl_error.update()
 
         card = ft.Container(
