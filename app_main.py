@@ -81,7 +81,7 @@ class MainApp:
         self.mostrar_login()
 
 
-# --- LÓGICA DEL DASHBOARD (Separada para orden) ---
+# --- LÓGICA DEL DASHBOARD  ---
 class DashboardLogic:
     def __init__(self, root, usuario, logout_callback):
         self.root = root
@@ -173,5 +173,5 @@ class DashboardLogic:
 
 
 if __name__ == "__main__":
-    # Arrancamos la app
+ 
     MainApp()
