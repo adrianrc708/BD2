@@ -132,12 +132,12 @@ def vista_empleados(page: ft.Page):
             cur = conn.cursor()
             pass_hash = encriptar(txt_pass.value) if txt_pass.value else None
 
-            if estado["id"] == 0:  # INSERT
+            if estado["id"] == 0:
                 cur.execute(
                     "INSERT INTO empleados (nombre, apellido, cargo, salario, usuario_app, password_hash) VALUES (:1,:2,:3,:4,:5,:6)",
                     [txt_nombre.value, txt_apellido.value, txt_cargo.value, float(txt_salario.value),
                      txt_usuario.value.upper(), pass_hash])
-            else:  # UPDATE
+            else:
                 if pass_hash:
                     cur.execute(
                         "UPDATE empleados SET nombre=:1, apellido=:2, cargo=:3, salario=:4, usuario_app=:5, password_hash=:6 WHERE id_empleado=:7",

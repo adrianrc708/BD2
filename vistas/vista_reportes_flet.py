@@ -1,4 +1,3 @@
-# canvas: AppTiendaOracle/vistas/vista_reportes_flet.py
 import flet as ft
 import matplotlib
 import matplotlib.pyplot as plt
@@ -12,7 +11,6 @@ import oracledb
 matplotlib.use("svg")
 
 # --- CONFIGURACIÓN PARA EL SCROLL ---
-# Referencia para la fila que contiene las cards
 fila_cards_ref = ft.Ref[ft.Row]()
 
 
@@ -80,7 +78,6 @@ def vista_reportes(page: ft.Page):
         finally:
             db_connector.release_connection(conn)
 
-    # Llamada inicial
     cargar_empleados()
     cargar_meses()
 
@@ -97,7 +94,6 @@ def vista_reportes(page: ft.Page):
 
         params = [filtro_mes, filtro_empleado_id]
 
-        # Llama a la función principal con los parámetros
         ejecutar_reporte("KPIs (Filtrado)", "pkg_reportes.rep_resumen_estadistico",
                          params,
                          ["Ámbito", "Ticket Prom. ($)", "Máximo", "Mínimo", "Total Trans."])
@@ -133,15 +129,11 @@ def vista_reportes(page: ft.Page):
         fila = fila_cards_ref.current
         paso_scroll = 1500
 
-        # Inicializar fila.offset a 0 si es None (para evitar TypeError)
         current_offset = fila.offset if fila.offset is not None else 0
 
         if direccion == 'left':
-            # Aseguramos que el offset no baje de cero
             new_offset = max(0, current_offset - paso_scroll)
         else:
-            # Mover a la derecha
-            # Flet automáticamente limita el scroll al ancho máximo del contenido.
             new_offset = current_offset + paso_scroll
 
         fila.scroll_to(offset=new_offset, duration=300)
@@ -341,7 +333,6 @@ def vista_reportes(page: ft.Page):
 
             # 2. Ajuste de encabezados
             if proc_name in ("pkg_reportes.rep_mejores_clientes", "pkg_reportes.rep_empleados_ingresos"):
-                # Se definen explícitamente 3 columnas: Nombre Completo + las últimas 2
                 visual_headers = ["Nombre Completo", columnas_header[2], columnas_header[3]]
             else:
                 visual_headers = columnas_header
@@ -356,14 +347,12 @@ def vista_reportes(page: ft.Page):
                 data_row = list(r)
 
                 if proc_name in ("pkg_reportes.rep_mejores_clientes", "pkg_reportes.rep_empleados_ingresos"):
-                    # --- LÓGICA EXPLÍCITA DE 3 CELDAS (PARA REPORTES 6 y 7) ---
-                    # Asumiendo que la BD devuelve 4 campos (nombre, apellido, valor1, valor2)
 
-                    # CELL 1: Nombre Completo (data_row[0] y data_row[1])
+                    # CELL 1: Nombre Completo
                     nombre_completo = f"{data_row[0]} {data_row[1]}"
                     celdas.append(ft.DataCell(ft.Text(nombre_completo, size=13, weight="bold")))
 
-                    # CELL 2: N° Compras/Ventas (data_row[2])
+                    # CELL 2: N° Compras/Ventas
                     val_c_v = data_row[2]
                     header_name_2 = visual_headers[1]
                     texto_formateado_2 = str(val_c_v)
@@ -372,7 +361,7 @@ def vista_reportes(page: ft.Page):
                             texto_formateado_2 = f"${val_c_v:,.2f}"
                     celdas.append(ft.DataCell(ft.Text(texto_formateado_2, size=13, color=ft.Colors.GREY_800)))
 
-                    # CELL 3: Total Gastado/Generado (data_row[3])
+                    # CELL 3: Total Gastado/Generado
                     val_total = data_row[3]
                     header_name_3 = visual_headers[2]
                     texto_formateado_3 = str(val_total)
@@ -381,7 +370,7 @@ def vista_reportes(page: ft.Page):
                             texto_formateado_3 = f"${val_total:,.2f}"
                     celdas.append(ft.DataCell(ft.Text(texto_formateado_3, size=13, color=ft.Colors.GREY_800)))
 
-                else:  # Manejo normal para los otros 8 reportes
+                else:
                     for i, val in enumerate(data_row):
                         header_name = visual_headers[i]
                         texto_formateado = str(val)
@@ -483,7 +472,7 @@ def vista_reportes(page: ft.Page):
 
     # --- IMPLEMENTACIÓN DE SCROLL CON FLECHAS ---
 
-    # 1. Definición de la fila de cards (ahora tiene una referencia)
+    # 1. Definición de la fila de cards
     fila_cards = ft.Row(
         ref=fila_cards_ref,
         controls=[
@@ -493,7 +482,6 @@ def vista_reportes(page: ft.Page):
             crear_card_reporte(ft.Icons.STAR_ROUNDED, "Top Prod.", "Vendidos", ft.Colors.PURPLE, ver_top),
             crear_card_reporte(ft.Icons.MONETIZATION_ON_ROUNDED, "Finanzas", "Valor Stock", ft.Colors.GREEN, ver_valor),
             crear_card_reporte(ft.Icons.SECURITY_ROUNDED, "Auditoría", "Cambios", ft.Colors.RED, ver_audit),
-            # Fila 2 (Nuevos)
             crear_card_reporte(ft.Icons.PEOPLE_ROUNDED, "Clientes VIP", "Top Compradores", ft.Colors.TEAL,
                                ver_clientes),
             crear_card_reporte(ft.Icons.BADGE_ROUNDED, "Empleados", "Rendimiento", ft.Colors.CYAN, ver_empleados),

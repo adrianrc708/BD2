@@ -105,7 +105,6 @@ def vista_productos(page: ft.Page):
     btn_calendario = ft.IconButton(ft.Icons.EDIT_CALENDAR, on_click=lambda e: page.open(date_picker),
                                    tooltip="Cambiar Fecha", icon_size=20)
 
-    # Botones de Acción
     btn_guardar = ft.ElevatedButton("GUARDAR NUEVO", icon=ft.Icons.SAVE,
                                     style=ft.ButtonStyle(bgcolor=ft.Colors.GREEN_600, color="white"),
                                     width=float("inf"), height=40)
@@ -276,7 +275,6 @@ def vista_productos(page: ft.Page):
             row = cur.fetchone()
             if row:
                 estado["id"] = row[0]
-                # Cargar datos
                 txt_nombre.value = row[1]
                 txt_categoria.value = row[2] or ""
                 txt_descripcion.value = row[3] or ""
