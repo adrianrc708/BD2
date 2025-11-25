@@ -194,7 +194,7 @@ def agregar_producto():
 
 def finalizar_venta_segura():
     if not carrito_productos: return
-    # Calculamos el total solo para validaciones visuales, pero NO lo enviamos a la BD
+    
     total_visual = sum(i["subtotal"] for i in carrito_productos)
 
     conn = db_connector.get_connection()
@@ -204,7 +204,7 @@ def finalizar_venta_segura():
         id_venta = cursor.var(oracledb.NUMBER)
 
         # 1. Crear Venta
-        # CORRECCIÓN: Enviamos 0 en lugar de 'total' para que el Trigger sume desde cero.
+       
         cursor.execute("""
                        INSERT INTO ventas (id_cliente, id_empleado, total)
                        VALUES (:1, :2, :3) RETURNING id_venta
