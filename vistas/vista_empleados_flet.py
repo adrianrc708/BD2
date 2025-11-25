@@ -8,7 +8,7 @@ def vista_empleados(page: ft.Page):
     estado = {"id": 0, "modo_edicion": False}
 
     # ==================================================
-    # HELPER: MOSTRAR ALERTA MODAL (CORREGIDO)
+    # HELPER: MOSTRAR ALERTA MODAL 
     # ==================================================
     def mostrar_alerta_bd(titulo, mensaje):
         contenido_dialogo = ft.Container(
@@ -36,7 +36,7 @@ def vista_empleados(page: ft.Page):
                         ft.ElevatedButton(
                             "ENTENDIDO",
                             style=ft.ButtonStyle(
-                                # CORRECCIÓN AQUÍ: Se usa ControlState en lugar de MaterialState
+                                
                                 bgcolor={ft.ControlState.DEFAULT: ft.Colors.RED_800,
                                          ft.ControlState.HOVERED: ft.Colors.RED_900},
                                 color="white",
