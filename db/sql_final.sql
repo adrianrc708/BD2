@@ -81,7 +81,7 @@ CREATE TABLE historial_precios (
 COMMIT;
 
 -----------------------------------------------------------------------------
--- 3. TRIGGERS (Nivel Avanzado: Auditoría y Validación Cruzada)
+-- 3. TRIGGERS 
 -----------------------------------------------------------------------------
 
 -- Trigger 1: Control de Stock (Lógica de Negocio básica)
@@ -122,7 +122,7 @@ BEGIN
 END;
 /
 
--- Trigger 4: Auditoría de Precios (Cumple con tema "Auditoría" y variables :OLD/:NEW)
+-- Trigger 4: Auditoría de Precios 
 CREATE OR REPLACE TRIGGER trg_auditoria_precios
 AFTER UPDATE OF precio ON productos
 FOR EACH ROW
@@ -155,7 +155,7 @@ END;
 COMMIT;
 
 -----------------------------------------------------------------------------
--- 4. PAQUETE DE GESTIÓN (Con EXCEPCIÓN PROPIA - Tema "11 Excepciones.pdf")
+-- 4. PAQUETE DE GESTIÓN 
 -----------------------------------------------------------------------------
 CREATE OR REPLACE PACKAGE pkg_gestion_productos AUTHID CURRENT_USER AS
   PROCEDURE sp_registrar (p_nombre VARCHAR2, p_categoria VARCHAR2, p_descripcion VARCHAR2, p_marca VARCHAR2, p_modelo VARCHAR2, p_precio NUMBER, p_stock NUMBER, p_proveedor VARCHAR2, p_fecha_venc DATE, p_estado VARCHAR2, p_ubicacion VARCHAR2);
@@ -176,7 +176,7 @@ CREATE OR REPLACE PACKAGE BODY pkg_gestion_productos AS
     p_marca VARCHAR2, p_modelo VARCHAR2, p_precio NUMBER, p_stock NUMBER,
     p_proveedor VARCHAR2, p_fecha_venc DATE, p_estado VARCHAR2, p_ubicacion VARCHAR2
   ) AS
-    -- [NIVEL EXPERTO] Declaración de Excepción Definida por el Usuario
+    -- Declaración de Excepción Definida por el Usuario
     e_producto_duplicado EXCEPTION;
     v_conteo NUMBER;
   BEGIN
@@ -193,7 +193,7 @@ CREATE OR REPLACE PACKAGE BODY pkg_gestion_productos AS
     COMMIT;
 
   EXCEPTION
-    -- [NIVEL EXPERTO] Manejo de la Excepción Propia
+    -- Manejo de la Excepción Propia
     WHEN e_producto_duplicado THEN
        RAISE_APPLICATION_ERROR(-20010, 'Error de Negocio: El producto "'||p_nombre||'" ya existe en el catálogo.');
     WHEN OTHERS THEN
@@ -216,7 +216,7 @@ END pkg_gestion_productos;
 
 
 -----------------------------------------------------------------------------
--- 5. PAQUETE DE REPORTES (OPTIMIZADO CON SYS_REFCURSOR)
+-- 5. PAQUETE DE REPORTES 
 -----------------------------------------------------------------------------
 CREATE OR REPLACE PACKAGE pkg_reportes AS
   PROCEDURE rep_ventas_por_mes (p_cursor OUT SYS_REFCURSOR);
@@ -224,10 +224,10 @@ CREATE OR REPLACE PACKAGE pkg_reportes AS
   PROCEDURE rep_productos_mas_vendidos (p_cursor OUT SYS_REFCURSOR);
   PROCEDURE rep_valor_inventario (p_cursor OUT SYS_REFCURSOR);
   PROCEDURE rep_auditoria_cambios (p_cursor OUT SYS_REFCURSOR);
-  PROCEDURE rep_mejores_clientes (p_cursor OUT SYS_REFCURSOR);       -- Reporte 6
-  PROCEDURE rep_empleados_ingresos (p_cursor OUT SYS_REFCURSOR);     -- Reporte 7
-  PROCEDURE rep_ventas_por_categoria (p_cursor OUT SYS_REFCURSOR);   -- Reporte 8
-  PROCEDURE rep_productos_sin_ventas (p_cursor OUT SYS_REFCURSOR);   -- Reporte 9 (Usa LEFT JOIN)
+  PROCEDURE rep_mejores_clientes (p_cursor OUT SYS_REFCURSOR);       
+  PROCEDURE rep_empleados_ingresos (p_cursor OUT SYS_REFCURSOR);    
+  PROCEDURE rep_ventas_por_categoria (p_cursor OUT SYS_REFCURSOR);   
+  PROCEDURE rep_productos_sin_ventas (p_cursor OUT SYS_REFCURSOR);   
   PROCEDURE rep_resumen_estadistico (p_mes IN VARCHAR2 DEFAULT NULL, p_id_empleado IN NUMBER DEFAULT NULL, p_cursor OUT SYS_REFCURSOR);
 END pkg_reportes;
 /
@@ -284,7 +284,7 @@ CREATE OR REPLACE PACKAGE BODY pkg_reportes AS
   PROCEDURE rep_mejores_clientes (p_cursor OUT SYS_REFCURSOR) IS
   BEGIN
     OPEN p_cursor FOR
-      SELECT c.nombre, c.apellido, -- DEVUELVE 4 COLUMNAS
+      SELECT c.nombre, c.apellido, 
              COUNT(v.id_venta) as cantidad_compras,
              NVL(SUM(v.total), 0) as total_gastado
       FROM clientes c
@@ -327,7 +327,7 @@ CREATE OR REPLACE PACKAGE BODY pkg_reportes AS
       SELECT p.nombre, p.stock, p.categoria
       FROM productos p
       LEFT JOIN detalle_venta d ON p.id_producto = d.id_producto
-      WHERE d.id_detalle IS NULL -- El truco del Left Join
+      WHERE d.id_detalle IS NULL 
       ORDER BY p.stock DESC;
   END rep_productos_sin_ventas;
 
